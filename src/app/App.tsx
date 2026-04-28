@@ -430,8 +430,8 @@ function JP_Handheld({ total, onAdd, onUndo, onReset, onListen }: JPProps) {
           }}>{fmt}</div>
         </LCD>
 
-        {/* Wallet window */}
-        <div style={{ height: 110 }}>
+        {/* Wallet window — fixed height, flex so WalletWindow's flex:1 is respected */}
+        <div style={{ height: 110, display: "flex", flexDirection: "column" }}>
           <WalletWindow amount={total} noteW={50} />
         </div>
 
