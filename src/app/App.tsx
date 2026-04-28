@@ -647,18 +647,14 @@ export default function App() {
 
   const isDesktop = vw >= 900;
 
-  // Scale to fill viewport — includes outer MetalFrame padding
   const FRAME_PAD = isDesktop ? 12 : 10;
   const totalDeviceW = isDesktop ? CONSOLE_W + FRAME_PAD * 2 : HANDHELD_W + FRAME_PAD * 2;
-  const totalDeviceH = isDesktop ? CONSOLE_H + FRAME_PAD * 2 : 530 + FRAME_PAD * 2; // 530 = handheld content estimate
-  const margin = 8;
-  const scale = Math.max(
-    0.25,
-    Math.min(
-      (vw - margin * 2) / totalDeviceW,
-      (vh - margin * 2) / totalDeviceH,
-    ),
-  );
+  const totalDeviceH = CONSOLE_H + FRAME_PAD * 2;
+  // Mobile: fill screen width edge-to-edge (height flows naturally)
+  // Desktop: fit both dimensions with a small margin
+  const scale = isDesktop
+    ? Math.max(0.3, Math.min((vw - 16) / totalDeviceW, (vh - 16) / totalDeviceH))
+    : vw / totalDeviceW;
 
   const handleAdd = (value: number) => {
     setHistory(prev => [...prev, value]);
@@ -688,12 +684,12 @@ export default function App() {
 
   return (
     <div style={{
-      width: "100dvw", height: "100dvh",
+      width: "100dvw", minHeight: "100dvh",
       background: "#1a1408",
       display: "flex", alignItems: "center", justifyContent: "center",
-      overflow: "hidden",
+      overflow: "auto",
     }}>
-      <div style={{ zoom: scale, transformOrigin: "center center" }}>
+      <div style={{ zoom: scale }}>
         {isDesktop ? <JP_Console {...props} /> : <JP_Handheld {...props} />}
       </div>
     </div>

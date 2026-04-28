@@ -5,11 +5,10 @@ export function useSpeech() {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      //imposta la voce italiana più naturale disponibile
-      const voice = await _getPreferredVoice();
-      if (voice) utterance.voice = voice;
       utterance.lang = 'it-IT';
       utterance.rate = 1.1;
+      const voice = await _getPreferredVoice();
+      if (voice) utterance.voice = voice;
       window.speechSynthesis.speak(utterance);
     }
   }, []);
@@ -17,45 +16,34 @@ export function useSpeech() {
   return { speak };
 }
 
-
 function _loadVoices(): Promise<SpeechSynthesisVoice[]> {
   const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    return voices;
-  }
+  if (voices.length > 0) return Promise.resolve(voices);
 
   return new Promise(resolve => {
     const handler = () => {
-      const loadedVoices = window.speechSynthesis.getVoices();
-      if (loadedVoices.length > 0) {
+      const loaded = window.speechSynthesis.getVoices();
+      if (loaded.length > 0) {
         window.speechSynthesis.removeEventListener('voiceschanged', handler);
-        resolve(loadedVoices);
+        resolve(loaded);
       }
     };
     window.speechSynthesis.addEventListener('voiceschanged', handler);
   });
 }
-/**
- * Returns the preferred .
- */
+
 async function _getPreferredVoice(): Promise<SpeechSynthesisVoice | null> {
   const voices = await _loadVoices();
 
-  const isFemale = false;
+  // Only consider Italian voices — setting a non-Italian voice overrides lang='it-IT'
+  const itVoices = voices.filter(v => v.lang.startsWith('it'));
 
-  const preferredFemale = ['Isabella', 'Alice', 'Microsoft Elsa', 'Google UK English Female'];
-  const preferredMale = ['Giuseppe', 'Microsoft Cosimo', 'Google UK English Male'];
-
-  const preferredList = isFemale ? preferredFemale : preferredMale;
-
-  for (const name of preferredList) {
-    const voice = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
-    if (voice) return voice;
+  const preferred = ['Giuseppe', 'Alice', 'Microsoft Cosimo', 'Microsoft Elsa', 'Isabella'];
+  for (const name of preferred) {
+    const match = itVoices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
+    if (match) return match;
   }
 
-  const fallback = voices.find(v =>
-    isFemale ? v.name.toLowerCase().includes('female') : v.name.toLowerCase().includes('male'),
-  );
-
-  return fallback ?? voices[0];
+  // First Italian voice available, or null (rely on lang tag alone)
+  return itVoices[0] ?? null;
 }
