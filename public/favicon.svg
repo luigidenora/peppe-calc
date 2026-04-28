@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background -->
+  <circle cx="50" cy="50" r="50" fill="#1a1408"/>
+
+  <!-- Outer amber ring (double) -->
+  <circle cx="50" cy="50" r="47" fill="none" stroke="#f4c020" stroke-width="2.5"/>
+  <circle cx="50" cy="50" r="43" fill="none" stroke="#f4c020" stroke-width="0.7" opacity="0.45"/>
+
+  <!-- Raptor footprint — 3 toes rotating from heel at (50,68) -->
+  <!-- Heel pad -->
+  <ellipse cx="50" cy="68" rx="9.5" ry="7.5" fill="#f4c020"/>
+
+  <!-- Middle toe (straight up) -->
+  <ellipse cx="50" cy="43" rx="5.5" ry="14" fill="#f4c020"/>
+
+  <!-- Left toe (−40° around heel) -->
+  <ellipse cx="50" cy="43" rx="5.5" ry="14" fill="#f4c020" transform="rotate(-40 50 68)"/>
+
+  <!-- Right toe (+40° around heel) -->
+  <ellipse cx="50" cy="43" rx="5.5" ry="14" fill="#f4c020" transform="rotate(40 50 68)"/>
+
+  <!-- Claw tips (dark amber at each toe tip) -->
+  <ellipse cx="50" cy="30" rx="3.5" ry="2.2" fill="#9a6a00"/>
+  <ellipse cx="50" cy="30" rx="3.5" ry="2.2" fill="#9a6a00" transform="rotate(-40 50 68)"/>
+  <ellipse cx="50" cy="30" rx="3.5" ry="2.2" fill="#9a6a00" transform="rotate(40 50 68)"/>
+
+  <!-- "INGEN" arc text at bottom — tiny, decorative -->
+  <path id="arc-bottom" d="M 22,72 A 30,30 0 0,0 78,72" fill="none"/>
+  <text font-family="monospace" font-size="7" letter-spacing="3" fill="#f4c020" opacity="0.75">
+    <textPath href="#arc-bottom" startOffset="50%" text-anchor="middle">INGEN</textPath>
+  </text>
+</svg>
