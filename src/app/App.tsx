@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
-import { MoneyButton } from './components/MoneyButton';
-import { MoneyVisualizer } from './components/MoneyVisualizer';
+import { useState, useEffect, CSSProperties } from 'react';
 import { useSpeech } from './components/useSpeech';
-import confetti from 'canvas-confetti';
+
 import img50 from '../imports/Banconota_Italia_50_euro_a.jpg';
 import img20 from '../imports/Banconota_Italia_20_euro_a.jpg';
 import img10 from '../imports/Banconota_Italia_10_euro_a.jpg';
@@ -16,241 +14,591 @@ import img005 from '../imports/5cent_comune.png';
 import img002 from '../imports/2cent_comune.png';
 import img001 from '../imports/1cent_comune.png';
 
-const EURO_NOTES = [
-  { value: 50, color: 'bg-orange-100' },
-  { value: 20, color: 'bg-blue-100' },
-  { value: 10, color: 'bg-red-100' },
-  { value: 5, color: 'bg-gray-100' },
-];
-
-const EURO_COINS = [
-  { value: 2, color: 'bg-yellow-200' },
-  { value: 1, color: 'bg-yellow-200' },
-  { value: 0.50, color: 'bg-yellow-200' },
-  { value: 0.20, color: 'bg-yellow-200' },
-  { value: 0.10, color: 'bg-yellow-200' },
-  { value: 0.05, color: 'bg-amber-200' },
-  { value: 0.02, color: 'bg-amber-200' },
-  { value: 0.01, color: 'bg-amber-200' },
-];
-
-// Immagini reali delle banconote e monete
-const getMoneyImage = (value: number): string => {
-  const images: Record<number, string> = {
-    50: img50,
-    20: img20,
-    10: img10,
-    5: img5,
-    2: img2,
-    1: img1,
-    0.50: img050,
-    0.20: img020,
-    0.10: img010,
-    0.05: img005,
-    0.02: img002,
-    0.01: img001,
-  };
-  return images[value] || img001;
+const NOTE_IMGS: Record<number, string> = {
+  50: img50, 20: img20, 10: img10, 5: img5,
+};
+const COIN_IMGS: Record<number, string> = {
+  2: img2, 1: img1, 0.5: img050, 0.2: img020,
+  0.1: img010, 0.05: img005, 0.02: img002, 0.01: img001,
 };
 
+const NOTES = [5, 10, 20, 50];
+const COINS = [0.01, 0.02, 0.05, 0.10, 0.20, 0.50, 1, 2];
+
+function breakdown(amount: number): number[] {
+  const denoms = [50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01];
+  const out: number[] = [];
+  let rem = Math.round(amount * 100);
+  for (const d of denoms) {
+    const dc = Math.round(d * 100);
+    while (rem >= dc) { out.push(d); rem -= dc; }
+  }
+  return out;
+}
+
+// ─── atoms ───────────────────────────────────────────────────────────────────
+
+const Screw = ({ s = 14, x, y }: { s?: number; x: number | string; y: number | string }) => (
+  <div style={{
+    position: 'absolute', top: y, left: x,
+    width: s, height: s, borderRadius: '50%',
+    background: 'radial-gradient(circle at 35% 30%, #d8cfb6 0%, #6c5a3a 60%, #2a1f10 100%)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.4), inset 0 -1px 1px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.5)',
+    zIndex: 10,
+  }}>
+    <div style={{
+      position: 'absolute', top: '50%', left: '15%', right: '15%', height: 1.5,
+      background: '#1a120a', transform: 'translateY(-50%) rotate(35deg)', borderRadius: 1,
+    }} />
+  </div>
+);
+
+const HazardStripe = ({ h = 12, w = '100%' }: { h?: number; w?: string | number }) => (
+  <div style={{
+    width: w, height: h, flexShrink: 0,
+    background: 'repeating-linear-gradient(135deg, #f4c020 0 14px, #1a1a1a 14px 28px)',
+    borderTop: '2px solid #1a1a1a', borderBottom: '2px solid #1a1a1a',
+  }} />
+);
+
+const Vent = ({ rows = 5, w = 80 }: { rows?: number; w?: number }) => (
+  <div style={{
+    width: w, background: '#2a2317', border: '1px solid #1a1408',
+    borderRadius: 3, padding: '4px 6px',
+    display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0,
+  }}>
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} style={{
+        height: 2, background: '#0a0805',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+      }} />
+    ))}
+  </div>
+);
+
+const Dymo = ({ children, color = '#a8112a', w }: {
+  children: React.ReactNode; color?: string; w?: number | string;
+}) => (
+  <div style={{
+    width: w, background: color, color: '#f4eedd',
+    fontFamily: '"Special Elite", "Courier New", monospace',
+    fontWeight: 700, fontSize: 11, letterSpacing: 1.5,
+    padding: '3px 10px',
+    border: '1px solid rgba(0,0,0,0.4)', borderRadius: 2,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.35)',
+    textShadow: '0 1px 0 rgba(0,0,0,0.4)',
+    textAlign: 'center' as const, textTransform: 'uppercase' as const,
+    flexShrink: 0, boxSizing: 'border-box' as const,
+  }}>{children}</div>
+);
+
+const ChunkyBtn = ({ children, w, h = 56, color = '#e8dec0', textColor = '#1a1a1a', dymoLabel, dymoColor, onClick }: {
+  children: React.ReactNode; w?: number | string; h?: number;
+  color?: string; textColor?: string; dymoLabel?: string; dymoColor?: string;
+  onClick?: () => void;
+}) => (
+  <button
+    onClick={onClick}
+    style={{
+      width: w, position: 'relative', background: 'none', border: 'none', padding: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+      cursor: 'pointer', touchAction: 'manipulation', flexShrink: 0,
+    } as CSSProperties}
+  >
+    <div style={{
+      width: '100%', height: h, borderRadius: 8,
+      background: `linear-gradient(180deg, ${color} 0%, ${color} 50%, #b9ac8a 100%)`,
+      border: '1.5px solid #4a3a20',
+      boxShadow: `
+        inset 0 2px 0 rgba(255,255,255,0.5),
+        inset 0 -3px 0 rgba(0,0,0,0.3),
+        inset 0 0 0 1px rgba(255,255,255,0.15),
+        0 4px 0 #5a4828,
+        0 5px 6px rgba(0,0,0,0.4)
+      `,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '"Share Tech Mono", monospace',
+      fontWeight: 700, fontSize: 18, color: textColor, letterSpacing: 1,
+    }}>{children}</div>
+    {dymoLabel && <Dymo color={dymoColor || '#1a1a1a'}>{dymoLabel}</Dymo>}
+  </button>
+);
+
+const LCD = ({ children, h = 110, glow = '#ffb733', bg = '#3a2a08', onClick }: {
+  children: React.ReactNode; h?: number; glow?: string; bg?: string; onClick?: () => void;
+}) => (
+  <div onClick={onClick} style={{
+    height: h, position: 'relative',
+    background: `linear-gradient(180deg, ${bg} 0%, #1a1305 100%)`,
+    border: '4px solid #1a1408', borderRadius: 6, padding: '8px 14px',
+    boxShadow: `
+      inset 0 0 30px rgba(0,0,0,0.7),
+      inset 0 2px 4px rgba(0,0,0,0.8),
+      0 0 0 2px #6c5a3a,
+      0 0 0 3px #2a1f10
+    `,
+    overflow: 'hidden', color: glow,
+    fontFamily: '"VT323", "Share Tech Mono", monospace',
+    textShadow: `0 0 4px ${glow}, 0 0 12px ${glow}`,
+    display: 'flex', alignItems: 'center',
+    cursor: onClick ? 'pointer' : undefined,
+  }}>
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.18) 2px 3px)',
+      pointerEvents: 'none',
+    }} />
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'repeating-linear-gradient(90deg, transparent 0 3px, rgba(0,0,0,0.08) 3px 4px)',
+      pointerEvents: 'none',
+    }} />
+    {children}
+  </div>
+);
+
+const LED = ({ on = true, color = '#ff2030', label }: { on?: boolean; color?: string; label?: string }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{
+      width: 10, height: 10, borderRadius: '50%',
+      background: on
+        ? `radial-gradient(circle at 35% 35%, #fff 0%, ${color} 50%, #5a0810 100%)`
+        : '#3a2a1a',
+      boxShadow: on ? `0 0 6px ${color}, 0 0 2px ${color}` : 'inset 0 1px 1px rgba(0,0,0,0.6)',
+      border: '1px solid #1a1408',
+    }} />
+    {label && (
+      <div style={{
+        fontFamily: '"Special Elite", monospace', fontSize: 9,
+        letterSpacing: 1.5, color: '#3a2a10', textTransform: 'uppercase',
+      }}>{label}</div>
+    )}
+  </div>
+);
+
+const SpeakerIcon = ({ size = 16, color = '#ffb733' }: { size?: number; color?: string }) => (
+  <svg
+    width={size} height={size} viewBox="0 0 16 16"
+    style={{ position: 'absolute', bottom: 6, left: 8, flexShrink: 0,
+      filter: `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 10px ${color})` }}
+    aria-hidden="true"
+  >
+    <polygon points="1,5 5,5 9,1 9,15 5,11 1,11" fill={color} />
+    <path d="M11 5.5 Q13.5 8 11 10.5" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+    <path d="M12.5 3.5 Q16 8 12.5 12.5" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+  </svg>
+);
+
+const WalletWindow = ({ amount, noteW }: { amount: number; noteW: number }) => {
+  const items = breakdown(amount);
+  const notes = items.filter(v => v >= 5);
+  const coins = items.filter(v => v < 5);
+
+  return (
+    <div style={{
+      height: '100%',
+      background: 'linear-gradient(180deg, #1a1305 0%, #2a1f08 100%)',
+      border: '4px solid #1a1408', borderRadius: 6, padding: '10px 12px',
+      boxShadow: `
+        inset 0 0 30px rgba(0,0,0,0.7),
+        inset 0 2px 4px rgba(0,0,0,0.8),
+        0 0 0 2px #6c5a3a,
+        0 0 0 3px #2a1f10
+      `,
+      position: 'relative', overflow: 'auto',
+    }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.18) 2px 3px)',
+        pointerEvents: 'none', zIndex: 1,
+      }} />
+      <div style={{ position: 'relative', zIndex: 0 }}>
+        {items.length === 0 ? (
+          <div style={{
+            fontFamily: '"VT323", monospace', fontSize: 22,
+            color: '#ffb733', textShadow: '0 0 6px #ffb733',
+          }}>--- EMPTY ---</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, filter: 'saturate(0.85) contrast(0.95)' }}>
+            {notes.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {notes.map((v, i) => (
+                  <div key={i} style={{
+                    width: noteW, aspectRatio: '16/9',
+                    backgroundImage: `url(${NOTE_IMGS[v]})`,
+                    backgroundSize: 'cover', borderRadius: 3,
+                    border: '1.5px solid rgba(0,0,0,0.5)',
+                    boxShadow: '0 1px 0 rgba(0,0,0,0.3)',
+                  }} />
+                ))}
+              </div>
+            )}
+            {coins.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                {coins.map((v, i) => (
+                  <div key={i} style={{
+                    width: noteW * 0.5, height: noteW * 0.5,
+                    backgroundImage: `url(${COIN_IMGS[v]})`,
+                    backgroundSize: 'contain', backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── layouts ─────────────────────────────────────────────────────────────────
+
+interface JPProps {
+  total: number;
+  onAdd: (value: number) => void;
+  onUndo: () => void;
+  onReset: () => void;
+  onListen: () => void;
+}
+
+function JP_Handheld({ total, onAdd, onUndo, onReset, onListen }: JPProps) {
+  const fmtTotal = total.toFixed(2).replace('.', ',');
+
+  return (
+    <div style={{
+      width: 440,
+      borderRadius: 22,
+      background: 'linear-gradient(135deg, #c9b896 0%, #b3a37e 50%, #9c8a6a 100%)',
+      border: '2px solid #2a1f10',
+      boxShadow: `
+        inset 0 2px 0 rgba(255,255,255,0.4),
+        inset 0 -4px 0 rgba(0,0,0,0.25),
+        inset 0 0 60px rgba(0,0,0,0.15),
+        0 8px 0 #5a4828,
+        12px 14px 0 rgba(0,0,0,0.5),
+        12px 14px 30px rgba(0,0,0,0.4)
+      `,
+      padding: 18, position: 'relative',
+      display: 'flex', flexDirection: 'column', gap: 12,
+      fontFamily: '"Share Tech Mono", monospace',
+      boxSizing: 'border-box',
+    }}>
+      <Screw x={10} y={10} />
+      <Screw x={414} y={10} />
+      <Screw x={10} y="calc(100% - 24px)" />
+      <Screw x={414} y="calc(100% - 24px)" />
+
+      {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px' }}>
+        <div style={{ display: 'flex', gap: 14 }}>
+          <LED on color="#1fe35c" label="PWR" />
+          <LED on color="#ffb733" label="REC" />
+          <LED on={false} color="#ff2030" label="ALERT" />
+        </div>
+        <div style={{ fontFamily: '"Black Ops One", monospace', fontSize: 11, letterSpacing: 2, color: '#3a2a10' }}>
+          CASH-COUNT 3000
+        </div>
+        <Vent rows={3} w={40} />
+      </div>
+
+      {/* LCD total — cliccabile per ascoltare */}
+      <div>
+        <Dymo color="#1a1a1a" w={120}>TOTAL · EUR</Dymo>
+        <div style={{ height: 8 }} />
+        <LCD h={88} onClick={onListen}>
+          <SpeakerIcon size={14} />
+          <div style={{
+            fontFamily: '"VT323", monospace',
+            fontSize: 72, lineHeight: 1, letterSpacing: 4,
+            width: '100%', textAlign: 'right',
+          }}>{fmtTotal}</div>
+        </LCD>
+      </div>
+
+      {/* Wallet window */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <Dymo color="#1a4a1a" w={160}>WALLET · CONTENT</Dymo>
+        <div style={{ height: 6 }} />
+        <div style={{ height: 110 }}>
+          <WalletWindow amount={total} noteW={50} />
+        </div>
+      </div>
+
+      <HazardStripe h={8} />
+
+      {/* Notes */}
+      <div>
+        <Dymo color="#1a1a1a" w={130}>INPUT · NOTES</Dymo>
+        <div style={{ height: 4 }} />
+        <div style={{
+          background: '#9c8a6a', border: '2px solid #4a3a20', borderRadius: 6, padding: 6,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 5,
+        }}>
+          {NOTES.map(v => (
+            <button key={v} onClick={() => onAdd(v)} style={{
+              aspectRatio: '16/10', borderRadius: 4, border: '1.5px solid #4a3a20', padding: 0,
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -2px 0 rgba(0,0,0,0.4), 0 3px 0 #5a4828`,
+              backgroundImage: `url(${NOTE_IMGS[v]})`,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+              cursor: 'pointer', touchAction: 'manipulation',
+            }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Coins */}
+      <div>
+        <Dymo color="#1a1a1a" w={130}>INPUT · COINS</Dymo>
+        <div style={{ height: 4 }} />
+        <div style={{
+          background: '#9c8a6a', border: '2px solid #4a3a20', borderRadius: 6, padding: 5,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+          display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 3,
+          justifyItems: 'center', alignItems: 'center',
+        }}>
+          {COINS.map(v => (
+            <button key={v} onClick={() => onAdd(v)} style={{
+              width: 38, height: 38, borderRadius: '50%', border: 'none', padding: 0,
+              backgroundImage: `url(${COIN_IMGS[v]})`,
+              backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
+              boxShadow: `inset 0 0 0 1.5px #4a3a20, 0 3px 0 #5a4828`,
+              cursor: 'pointer', touchAction: 'manipulation',
+            }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+        <ChunkyBtn w={196} h={48} dymoLabel="UNDO LAST" dymoColor="#1a1a1a" onClick={onUndo}>↶</ChunkyBtn>
+        <ChunkyBtn w={196} h={48} color="#d8806a" dymoLabel="CLEAR ALL" dymoColor="#a8112a" onClick={onReset}>RST</ChunkyBtn>
+      </div>
+    </div>
+  );
+}
+
+function JP_Console({ total, onAdd, onUndo, onReset, onListen }: JPProps) {
+  const fmtTotal = total.toFixed(2).replace('.', ',');
+
+  return (
+    <div style={{
+      width: 1100, height: 720,
+      borderRadius: 18,
+      background: 'linear-gradient(135deg, #c9b896 0%, #b3a37e 50%, #9c8a6a 100%)',
+      border: '2px solid #2a1f10',
+      boxShadow: `
+        inset 0 2px 0 rgba(255,255,255,0.4),
+        inset 0 -4px 0 rgba(0,0,0,0.25),
+        inset 0 0 80px rgba(0,0,0,0.15),
+        0 8px 0 #5a4828,
+        14px 16px 0 rgba(0,0,0,0.5)
+      `,
+      padding: 22, position: 'relative',
+      display: 'flex', gap: 18,
+      fontFamily: '"Share Tech Mono", monospace',
+      boxSizing: 'border-box',
+    }}>
+      <Screw x={12} y={12} s={16} />
+      <Screw x={1072} y={12} s={16} />
+      <Screw x={12} y={692} s={16} />
+      <Screw x={1072} y={692} s={16} />
+      <Screw x={540} y={12} s={12} />
+      <Screw x={540} y={696} s={12} />
+
+      {/* Left panel */}
+      <div style={{ flex: '0 0 480px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px' }}>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <LED on color="#1fe35c" label="PWR" />
+            <LED on color="#ffb733" label="REC" />
+            <LED on={false} color="#ff2030" label="ALERT" />
+          </div>
+          <div style={{ fontFamily: '"Black Ops One", monospace', fontSize: 14, letterSpacing: 3, color: '#3a2a10' }}>
+            CASH-COUNT 3000
+          </div>
+        </div>
+
+        {/* LCD total — cliccabile per ascoltare */}
+        <div>
+          <Dymo color="#1a1a1a" w={150}>TOTAL · EUR</Dymo>
+          <div style={{ height: 6 }} />
+          <LCD h={130} onClick={onListen}>
+            <SpeakerIcon size={18} />
+            <div style={{
+              fontFamily: '"VT323", monospace',
+              fontSize: 110, lineHeight: 1, letterSpacing: 6,
+              width: '100%', textAlign: 'right',
+            }}>{fmtTotal}</div>
+          </LCD>
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Dymo color="#1a4a1a" w={180}>WALLET · CONTENT</Dymo>
+          <div style={{ height: 6 }} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <WalletWindow amount={total} noteW={84} />
+          </div>
+        </div>
+
+        <HazardStripe h={10} />
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <ChunkyBtn w="50%" h={60} dymoLabel="UNDO LAST" dymoColor="#1a1a1a" onClick={onUndo}>↶</ChunkyBtn>
+          <ChunkyBtn w="50%" h={60} color="#d8806a" dymoLabel="CLEAR ALL" dymoColor="#a8112a" onClick={onReset}>RST</ChunkyBtn>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{
+        width: 4, alignSelf: 'stretch',
+        background: 'linear-gradient(180deg, transparent, #2a1f10, transparent)',
+        flexShrink: 0,
+      }} />
+
+      {/* Right panel */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <Dymo color="#1a1a1a" w={170}>INPUT · NOTES</Dymo>
+        <div style={{
+          background: '#9c8a6a', border: '2px solid #4a3a20', borderRadius: 8, padding: 12,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+          display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12,
+        }}>
+          {NOTES.map(v => (
+            <div key={v} style={{ position: 'relative' }}>
+              <button
+                onClick={() => onAdd(v)}
+                style={{
+                  width: '100%', aspectRatio: '16/9', borderRadius: 6, border: '2px solid #4a3a20', padding: 0,
+                  boxShadow: `
+                    inset 0 2px 0 rgba(255,255,255,0.3),
+                    inset 0 -3px 0 rgba(0,0,0,0.4),
+                    0 4px 0 #5a4828,
+                    0 5px 6px rgba(0,0,0,0.4)
+                  `,
+                  backgroundImage: `url(${NOTE_IMGS[v]})`,
+                  backgroundSize: 'cover', backgroundPosition: 'center',
+                  cursor: 'pointer', touchAction: 'manipulation', position: 'relative',
+                }}
+              >
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: 4,
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.2) 100%)',
+                  pointerEvents: 'none',
+                }} />
+              </button>
+              <div style={{ position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)' }}>
+                <Dymo color="#1a1a1a">{`+${v} EUR`}</Dymo>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 8 }} />
+
+        <Dymo color="#1a1a1a" w={170}>INPUT · COINS</Dymo>
+        <div style={{
+          background: '#9c8a6a', border: '2px solid #4a3a20', borderRadius: 8, padding: 12,
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)',
+          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10,
+          flex: 1, alignContent: 'center',
+        }}>
+          {COINS.map(v => (
+            <div key={v} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <button
+                onClick={() => onAdd(v)}
+                style={{
+                  width: 70, height: 70, borderRadius: '50%', border: 'none', padding: 0,
+                  backgroundImage: `url(${COIN_IMGS[v]})`,
+                  backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center',
+                  boxShadow: `inset 0 0 0 2px #4a3a20, 0 4px 0 #5a4828, 0 5px 6px rgba(0,0,0,0.4)`,
+                  cursor: 'pointer', touchAction: 'manipulation',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom strip */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px' }}>
+          <Vent rows={3} w={70} />
+          <div style={{
+            fontFamily: '"Special Elite", monospace',
+            fontSize: 9, color: '#3a2a10', letterSpacing: 2,
+            flex: 1, textAlign: 'center',
+          }}>S/N · CC3K-1993-0451 · ⚠ DO NOT REMOVE COVER ⚠</div>
+          <Vent rows={3} w={70} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── root ─────────────────────────────────────────────────────────────────────
+
 export default function App() {
-  const [mode, setMode] = useState<'count' | 'change'>('count');
-  const [total, setTotal] = useState(0);
-  const [itemPrice, setItemPrice] = useState<number | null>(null);
-  const [moneyGiven, setMoneyGiven] = useState(0);
-  const [showPriceInput, setShowPriceInput] = useState(false);
-  const [changePhase, setChangePhase] = useState<'price' | 'payment' | 'verify'>('price');
+  const [history, setHistory] = useState<number[]>([]);
   const { speak } = useSpeech();
 
-  const changeToReceive = moneyGiven - (itemPrice || 0);
+  const totalCents = history.reduce((sum, v) => sum + Math.round(v * 100), 0);
+  const total = totalCents / 100;
 
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 900);
   useEffect(() => {
-    if (mode === 'change' && changePhase === 'verify' && total === 0 && changeToReceive > 0) {
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        origin: { y: 0.6 }
-      });
-      speak('Resto corretto! Bravo!');
-    }
-  }, [total, mode, changePhase, changeToReceive, speak]);
+    const handler = () => setIsDesktop(window.innerWidth >= 900);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
-  const handleAddMoney = (value: number) => {
-    if (mode === 'count') {
-      setTotal(prev => prev + value);
-    } else if (mode === 'change') {
-      if (changePhase === 'payment') {
-        setMoneyGiven(prev => prev + value);
-      } else if (changePhase === 'verify') {
-        setTotal(prev => Math.max(0, prev - value));
-      }
-    }
+  const handleAdd = (value: number) => {
+    setHistory(prev => [...prev, value]);
+    const text = value >= 1
+      ? `${value} euro`
+      : `${Math.round(value * 100)} centesimi`;
+    speak(text);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    setHistory(prev => prev.slice(0, -1));
+    speak('Annullato');
   };
 
   const handleReset = () => {
-    setTotal(0);
-    setItemPrice(null);
-    setMoneyGiven(0);
-    setShowPriceInput(false);
-    setChangePhase('price');
+    setHistory([]);
     speak('Azzerato');
   };
 
-  const handleModeChange = (newMode: 'count' | 'change') => {
-    setMode(newMode);
-    setTotal(0);
-    setItemPrice(null);
-    setMoneyGiven(0);
-    setShowPriceInput(newMode === 'change');
-    setChangePhase('price');
-    speak(newMode === 'count' ? 'Modalità conta risparmi' : 'Modalità resto per acquisti');
-  };
-
-  const handleSetPrice = (price: number) => {
-    setItemPrice(price);
-    setShowPriceInput(false);
-    setChangePhase('payment');
-    speak(`Prezzo: ${price} euro. Ora aggiungi i soldi che dai`);
-  };
-
-  const handleConfirmPayment = () => {
-    if (moneyGiven >= (itemPrice || 0)) {
-      const change = moneyGiven - (itemPrice || 0);
-      setTotal(change);
-      setChangePhase('verify');
-      speak(`Devi ricevere ${change.toFixed(2)} euro di resto. Verifica il resto ricevuto`);
+  const handleListen = () => {
+    if (total === 0) {
+      speak('Zero euro');
+      return;
+    }
+    const euros = Math.floor(total);
+    const cents = Math.round((total - euros) * 100);
+    if (cents === 0) {
+      speak(`${euros} euro`);
     } else {
-      speak('Aggiungi più soldi');
+      speak(`${euros} euro e ${cents} centesimi`);
     }
   };
 
   return (
-    <div className={`min-h-screen ${mode === 'count' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : 'bg-gradient-to-br from-green-400 to-green-600'} p-3`}>
-      <div className="max-w-md mx-auto h-screen flex flex-col gap-3 py-3">
-        {/* Header con modalità */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleModeChange('count')}
-            className={`flex-1 py-6 rounded-xl transition-all touch-manipulation text-5xl ${
-              mode === 'count'
-                ? 'bg-white shadow-lg scale-105'
-                : 'bg-blue-300'
-            }`}
-          >
-            🏦
-          </button>
-          <button
-            onClick={() => handleModeChange('change')}
-            className={`flex-1 py-6 rounded-xl transition-all touch-manipulation text-5xl ${
-              mode === 'change'
-                ? 'bg-white shadow-lg scale-105'
-                : 'bg-green-300'
-            }`}
-          >
-            🛒
-          </button>
-        </div>
-
-        {/* Input per prezzo articolo */}
-        {showPriceInput && (
-          <div className="bg-white rounded-2xl p-4 shadow-lg">
-            <div className="grid grid-cols-2 gap-3">
-              {[2.50, 5, 7.50, 10, 12.50, 15, 20, 25].map(price => (
-                <button
-                  key={price}
-                  onClick={() => handleSetPrice(price)}
-                  className="py-6 bg-red-500 text-white font-bold text-3xl rounded-xl shadow-md active:scale-95 transition-transform touch-manipulation"
-                >
-                  {price}€
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Info pagamento modalità resto */}
-        {mode === 'change' && !showPriceInput && changePhase === 'payment' && (
-          <div className="bg-white rounded-2xl p-4 shadow-lg space-y-3">
-            <div className="bg-red-50 rounded-xl p-3">
-              <div className="text-3xl text-center mb-2">🏷️</div>
-              <MoneyVisualizer amount={itemPrice || 0} />
-            </div>
-            <div className="bg-green-50 rounded-xl p-3">
-              <div className="text-3xl text-center mb-2">💵</div>
-              <MoneyVisualizer amount={moneyGiven} />
-            </div>
-            <button
-              onClick={handleConfirmPayment}
-              className="w-full py-6 bg-green-500 text-white font-bold text-5xl rounded-xl shadow-md active:scale-95 transition-transform touch-manipulation disabled:bg-gray-300"
-              disabled={moneyGiven < (itemPrice || 0)}
-            >
-              ✓
-            </button>
-          </div>
-        )}
-
-        {/* Totale */}
-        {!showPriceInput && (mode === 'count' || changePhase === 'verify') && (
-          <button
-            onClick={() => {
-              const euros = Math.floor(total);
-              const cents = Math.round((total - euros) * 100);
-              if (total === 0) {
-                speak('Zero euro');
-              } else if (cents === 0) {
-                speak(`${euros} euro`);
-              } else {
-                speak(`${euros} euro e ${cents} centesimi`);
-              }
-            }}
-            className="w-full bg-white rounded-2xl shadow-lg active:scale-95 transition-transform touch-manipulation p-6"
-          >
-            <MoneyVisualizer amount={total} />
-          </button>
-        )}
-
-        {/* Area scrollabile con banconote e monete */}
-        {!showPriceInput && <div className="flex-1 overflow-y-auto space-y-3 pb-2">
-          {/* Banconote */}
-          <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3">
-            <div className="grid grid-cols-2 gap-3">
-              {EURO_NOTES.map(({ value }) => (
-                <MoneyButton
-                  key={value}
-                  value={value}
-                  imageUrl={getMoneyImage(value)}
-                  onSelect={handleAddMoney}
-                  speak={speak}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Monete */}
-          <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-3">
-            <div className="grid grid-cols-3 gap-3">
-              {EURO_COINS.map(({ value }) => (
-                <MoneyButton
-                  key={value}
-                  value={value}
-                  imageUrl={getMoneyImage(value)}
-                  onSelect={handleAddMoney}
-                  speak={speak}
-                  compact
-                />
-              ))}
-            </div>
-          </div>
-        </div>}
-
-        {/* Pulsante Reset */}
-        <button
-          onClick={handleReset}
-          className="w-full py-5 bg-red-500 text-white font-bold text-5xl rounded-xl shadow-lg active:scale-95 transition-all touch-manipulation"
-        >
-          🔄
-        </button>
-      </div>
+    <div style={{
+      minHeight: '100vh',
+      background: '#1a1408',
+      display: 'flex',
+      alignItems: isDesktop ? 'center' : 'flex-start',
+      justifyContent: 'center',
+      padding: isDesktop ? '20px' : '20px 20px 40px',
+      overflowX: 'auto',
+    }}>
+      {isDesktop ? (
+        <JP_Console total={total} onAdd={handleAdd} onUndo={handleUndo} onReset={handleReset} onListen={handleListen} />
+      ) : (
+        <JP_Handheld total={total} onAdd={handleAdd} onUndo={handleUndo} onReset={handleReset} onListen={handleListen} />
+      )}
     </div>
   );
 }
